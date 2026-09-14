@@ -14,13 +14,13 @@ use std::net::TcpListener;
 use std::time::Duration;
 
 use transport::Arrived;
-use transport::error::{Result, protocol_error};
-use transport::socket;
+use transport::error::Result;
 
 use crate::ceiling;
-use http::message::{self, Request, Response};
-use transport_azure_service_bus::rest::{self, subcode};
-use transport_azure_service_bus::sas::{self, Signer, Token};
+use http::message::{Request, Response};
+use http::namespace::{self, subcode};
+use http::sas::{self, Signer, Token};
+use http::server;
 
 /// How many partitions a hub opens with.
 pub const PARTITIONS: u32 = 4;
@@ -82,13 +82,7 @@ impl Session {
     /// # Errors
     /// Where the connection could not be accepted, broke, or sent nothing.
     pub fn serve_one(&mut self, listener: &TcpListener) -> Result<Event> {
-        let (stream, _) = socket::accept_tcp(listener, self.timeout)?;
-        let (mut reader, mut writer) = socket::split(stream)?;
-        let request = message::read_request(&mut reader)?
-            .ok_or_else(|| protocol_error("a connection that sent no request"))?;
-        let (event, response) = self.answer(&request);
-        message::write_response(&mut writer, &response)?;
-        Ok(event)
+        server::serve_one(listener, self.timeout, |request| self.answer(request))
     }
 
     fn answer(&mut self, request: &Request) -> (Event, Response) {
@@ -149,7 +143,10 @@ fn base(token: &Token) -> &str {
 }
 
 fn refused(status: u16, detail: &str) -> (Event, Response) {
-    (Event::Refused(subcode(detail)), rest::error(status, detail))
+    (
+        Event::Refused(subcode(detail)),
+        namespace::error(status, detail),
+    )
 }
 
 #[cfg(test)]
