@@ -15,8 +15,8 @@ use transport::error::Result;
 
 use http::endpoint;
 use http::message::{self, Request, Response};
-use transport_azure_service_bus::rest;
-use transport_azure_service_bus::sas::{self, Signer};
+use http::namespace;
+use http::sas::{self, Signer};
 
 /// The content type the REST API documents for one event.
 pub const CONTENT_TYPE: &str = "application/atom+xml;type=entry;charset=utf-8";
@@ -73,7 +73,7 @@ impl Client {
         let expiry = sas::now() + sas::LIFETIME;
         let signed = self.signer.sign(request, &self.resource(hub), expiry);
         let stream = endpoint::connect(&self.endpoint, self.timeout)?;
-        rest::judge("Event Hubs", message::exchange(stream, &signed)?).map(|_: Response| ())
+        namespace::judge("Event Hubs", message::exchange(stream, &signed)?).map(|_: Response| ())
     }
 }
 
