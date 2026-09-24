@@ -52,7 +52,9 @@ use std::time::Duration;
 pub use client::{CONTENT_TYPE, Client};
 use http::endpoint;
 pub use session::{Event, PARTITIONS, Session};
+use transport::ceiling;
 use transport::error::{Result, TransportError, protocol_error};
+use transport::listening::Listening;
 use transport::loopback::{FarEnd, LOOPBACK_TIMEOUT, Loopback};
 use transport::socket;
 use transport::{Arrived, Directions, Transport};
@@ -171,13 +173,7 @@ impl Transport for EventHubsTransport {
     }
 
     fn send(&self, target: &str, bytes: &[u8]) -> Result<()> {
-        if bytes.len() > ceiling() {
-            return Err(TransportError::permanent(format!(
-                "{} bytes is over the {} one Event Hubs event carries",
-                bytes.len(),
-                ceiling()
-            )));
-        }
+        ceiling::within(bytes.len(), ceiling(), "one Event Hubs event carries")?;
         let (hub, partition) = self.resolve(target);
         self.client()?.send(hub, partition, bytes)
     }
@@ -195,38 +191,20 @@ impl EventHubsTransport {
     }
 }
 
-/// A bound session waiting for its one send.
-struct Serving {
-    session: Session,
-    listener: TcpListener,
-    address: String,
-}
-
-impl FarEnd for Serving {
-    fn address(&self) -> &str {
-        &self.address
-    }
-
-    fn take_one(mut self: Box<Self>) -> Result<Arrived> {
-        match self.session.serve_one(&self.listener)? {
-            Event::Sent(arrived) => Ok(arrived),
-            Event::Refused(code) => Err(protocol_error(format!("the session refused: {code}"))),
-        }
-    }
-}
-
 impl Loopback for EventHubsTransport {
     fn ceiling(&self) -> Option<usize> {
         Some(ceiling())
     }
 
     fn far_end(&self) -> Result<Box<dyn FarEnd>> {
-        let (listener, address) = socket::bind_tcp(&endpoint::authority(&self.endpoint)?)?;
-        Ok(Box::new(Serving {
-            session: self.session(),
-            listener,
-            address,
-        }))
+        let mut session = self.session();
+        Ok(Box::new(Listening::new(
+            move |listener: &TcpListener| match session.serve_one(listener)? {
+                Event::Sent(arrived) => Ok(arrived),
+                Event::Refused(code) => Err(protocol_error(format!("the session refused: {code}"))),
+            },
+            socket::bind_tcp(&endpoint::authority(&self.endpoint)?)?,
+        )))
     }
 
     /// Send the payload as one event, from a fresh near end signing as
