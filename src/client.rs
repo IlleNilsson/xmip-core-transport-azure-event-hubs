@@ -13,10 +13,10 @@ use std::time::Duration;
 
 use transport::error::Result;
 
+use azure::namespace;
+use azure::sas::{self, Signer};
 use http::endpoint;
 use http::message::{self, Request, Response};
-use http::namespace;
-use http::sas::{self, Signer};
 
 /// The content type the REST API documents for one event.
 pub const CONTENT_TYPE: &str = "application/atom+xml;type=entry;charset=utf-8";

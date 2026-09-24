@@ -23,11 +23,12 @@
 //! session.rs   the far end a test or the playground runs on loopback
 //! ```
 //!
-//! The endpoint, HTTP itself, the Shared Access Signature and the
-//! judgement of the namespace's answers come from the http technology
-//! (ADR-0044). Until 2026-09-14 the last two came from the azure-service-bus
-//! technology, a sideways import the record forbids; what two technologies
-//! both speak over HTTP is the carrier's to share.
+//! The endpoint and HTTP itself come from the http technology; the Shared
+//! Access Signature and the judgement of the namespace's answers from the
+//! Azure crate (ADR-0044). Until 2026-09-14 the last two came from the
+//! azure-service-bus technology, a sideways import the record forbids, and
+//! from the http technology until the owner's ruling of 2026-09-22: what
+//! Azure speaks is the Azure crate's to share.
 //!
 //! An event is bytes — the body as it is, one mebibyte at most on the
 //! Standard tier: [`ceiling`]. Nothing is refused for its content, an

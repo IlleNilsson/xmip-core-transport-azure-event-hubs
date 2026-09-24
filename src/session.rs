@@ -17,9 +17,9 @@ use transport::Arrived;
 use transport::error::Result;
 
 use crate::ceiling;
+use azure::namespace::{self, subcode};
+use azure::sas::{self, Signer, Token};
 use http::message::{Request, Response};
-use http::namespace::{self, subcode};
-use http::sas::{self, Signer, Token};
 use http::server;
 
 /// How many partitions a hub opens with.
