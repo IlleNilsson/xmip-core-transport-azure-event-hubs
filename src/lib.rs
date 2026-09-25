@@ -50,7 +50,7 @@ use std::net::TcpListener;
 use std::time::Duration;
 
 pub use client::{CONTENT_TYPE, Client};
-use http::endpoint;
+use net::Endpoint;
 pub use session::{Event, PARTITIONS, Session};
 use transport::ceiling;
 use transport::error::{Result, TransportError, protocol_error};
@@ -203,7 +203,7 @@ impl Loopback for EventHubsTransport {
                 Event::Sent(arrived) => Ok(arrived),
                 Event::Refused(code) => Err(protocol_error(format!("the session refused: {code}"))),
             },
-            socket::bind_tcp(&endpoint::authority(&self.endpoint)?)?,
+            socket::bind_tcp(&Endpoint::parse(&self.endpoint)?.address())?,
         )))
     }
 

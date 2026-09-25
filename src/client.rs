@@ -16,14 +16,15 @@ use transport::error::Result;
 use azure::namespace;
 use azure::sas::{self, Signer};
 use http::endpoint;
-use http::message::{self, Request, Response};
+use net::Endpoint;
+use net::http::{Request, Response};
 
 /// The content type the REST API documents for one event.
 pub const CONTENT_TYPE: &str = "application/atom+xml;type=entry;charset=utf-8";
 
 pub struct Client {
-    endpoint: String,
-    host: String,
+    namespace: String,
+    endpoint: Endpoint,
     signer: Signer,
     timeout: Option<Duration>,
 }
@@ -36,8 +37,8 @@ impl Client {
     /// Where `endpoint` is not an HTTP URL.
     pub fn new(endpoint: &str, policy: &str, key: &str) -> Result<Self> {
         Ok(Self {
-            endpoint: endpoint.trim_end_matches('/').to_string(),
-            host: endpoint::authority(endpoint)?,
+            namespace: endpoint.trim_end_matches('/').to_string(),
+            endpoint: Endpoint::parse(endpoint)?,
             signer: Signer::new(policy, key),
             timeout: None,
         })
@@ -53,7 +54,7 @@ impl Client {
     /// The resource a token for `hub` names: the hub's own URL.
     #[must_use]
     pub fn resource(&self, hub: &str) -> String {
-        format!("{}/{hub}", self.endpoint)
+        format!("{}/{hub}", self.namespace)
     }
 
     /// Send `bytes` as one event to `hub`, to `partition` where one is
@@ -68,12 +69,12 @@ impl Client {
         };
         let request = Request::new("POST", path)
             .header("Content-Type", CONTENT_TYPE)
-            .header("Host", &self.host)
+            .header("Host", &self.endpoint.authority())
             .body(bytes);
         let expiry = sas::now() + sas::LIFETIME;
         let signed = self.signer.sign(request, &self.resource(hub), expiry);
         let stream = endpoint::connect(&self.endpoint, self.timeout)?;
-        namespace::judge("Event Hubs", message::exchange(stream, &signed)?).map(|_: Response| ())
+        namespace::judge("Event Hubs", net::http::exchange(stream, &signed)?).map(|_: Response| ())
     }
 }
 

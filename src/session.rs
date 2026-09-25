@@ -19,8 +19,8 @@ use transport::error::Result;
 use crate::ceiling;
 use azure::namespace::{self, subcode};
 use azure::sas::{self, Signer, Token};
-use http::message::{Request, Response};
 use http::server;
+use net::http::{Request, Response};
 
 /// How many partitions a hub opens with.
 pub const PARTITIONS: u32 = 4;
