@@ -50,6 +50,7 @@ use std::net::TcpListener;
 use std::time::Duration;
 
 pub use client::{CONTENT_TYPE, Client};
+use http::endpoint::Connections;
 use net::Endpoint;
 pub use session::{Event, PARTITIONS, Session};
 use transport::ceiling;
@@ -79,6 +80,9 @@ pub struct EventHubsTransport {
     policy: String,
     key: String,
     timeout: Option<Duration>,
+    /// The connections kept to the service, shared by every client this
+    /// makes.
+    connections: Connections,
 }
 
 impl EventHubsTransport {
@@ -94,6 +98,7 @@ impl EventHubsTransport {
             policy: String::new(),
             key: String::new(),
             timeout: None,
+            connections: Connections::new(),
         }
     }
 
@@ -126,6 +131,7 @@ impl EventHubsTransport {
     /// Where the endpoint is not an HTTP URL.
     pub fn client(&self) -> Result<Client> {
         let client = Client::new(&self.endpoint, &self.policy, &self.key)?;
+        let client = client.sharing(self.connections.clone());
         Ok(match self.timeout {
             Some(timeout) => client.timing_out_after(timeout),
             None => client,
