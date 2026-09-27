@@ -57,7 +57,8 @@ use transport::error::{Result, TransportError, protocol_error};
 use transport::listening::Listening;
 use transport::loopback::{FarEnd, LOOPBACK_TIMEOUT, Loopback};
 use transport::socket;
-use transport::{Arrived, Directions, Transport};
+use transport::{Arrived, Configured, Directions, Transport};
+use xcore::settings::{Applies, Kind, Presence, Read, Setting, Settings};
 
 /// The largest event a Standard namespace carries: one mebibyte.
 #[must_use]
@@ -179,6 +180,52 @@ impl Transport for EventHubsTransport {
     }
 }
 
+impl Configured for EventHubsTransport {
+    /// The address is the namespace, `https://<ns>.servicebus.windows.net`.
+    /// The shared access policy and its key are the Location's credentials,
+    /// not settings: a secret never is.
+    const SETTINGS: &'static Settings = &Settings {
+        technology: env!("CARGO_PKG_NAME"),
+        settings: &[
+            Setting {
+                name: "hub",
+                kind: Kind::Text,
+                presence: Presence::Required,
+                meaning: "The Event Hub sent to when a send target names none.",
+                applies: Applies::Send,
+            },
+            Setting {
+                name: "partition",
+                kind: Kind::Text,
+                presence: Presence::Optional,
+                meaning: "The partition of the hub sent to; the hub chooses when left out.",
+                applies: Applies::Send,
+            },
+            Setting {
+                name: "timeout",
+                kind: Kind::Duration,
+                presence: Presence::Optional,
+                meaning: "How long an endpoint that stops answering is waited on; unbounded \
+                          when left out.",
+                applies: Applies::Send,
+            },
+        ],
+    };
+
+    fn configured(address: &str, settings: &Read) -> Result<Self> {
+        // The policy and its key come through the Location's credentials.
+        let hub = settings.optional_text("hub").unwrap_or_default();
+        let mut transport = Self::new(address, hub);
+        if let Some(partition) = settings.optional_text("partition") {
+            transport = transport.on_partition(partition);
+        }
+        Ok(match settings.optional_duration("timeout") {
+            Some(timeout) => transport.timing_out_after(timeout),
+            None => transport,
+        })
+    }
+}
+
 impl EventHubsTransport {
     /// Both ends on this machine: an ephemeral local port, one policy and
     /// key the far end expects and the near end signs with, the loopback
@@ -226,6 +273,34 @@ mod tests {
         EventHubsTransport::new(endpoint, "telemetry")
             .with_policy("policy", key)
             .timing_out_after(Duration::from_secs(2))
+    }
+
+    #[test]
+    fn event_hubs_declares_its_settings_and_reads_through_them() {
+        use xcore::settings::Given;
+        assert_eq!(
+            EventHubsTransport::SETTINGS.problems(),
+            Vec::<String>::new()
+        );
+        let text = |name: &str, value: &str| (name.to_string(), Given::Text(value.to_string()));
+        let namespace = "https://trade.servicebus.windows.net";
+        let given = [
+            text("hub", "telemetry"),
+            text("partition", "2"),
+            text("timeout", "5s"),
+        ];
+        let sent = EventHubsTransport::open(namespace, Applies::Send, &given).expect("built");
+        assert_eq!(
+            (sent.endpoint.as_str(), sent.hub.as_str()),
+            (namespace, "telemetry")
+        );
+        assert_eq!(sent.partition.as_deref(), Some("2"));
+        assert_eq!(sent.timeout, Some(Duration::from_secs(5)));
+        assert!(sent.key.is_empty(), "the key is the credentials'");
+        let Err(refused) = EventHubsTransport::open(namespace, Applies::Send, &given[1..]) else {
+            panic!("the hub is required");
+        };
+        assert!(refused.message.contains("\"hub\""), "{refused}");
     }
 
     #[test]
