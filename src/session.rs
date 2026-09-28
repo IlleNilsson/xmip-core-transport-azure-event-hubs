@@ -18,7 +18,7 @@ use transport::error::Result;
 
 use crate::ceiling;
 use azure::namespace::{self, subcode};
-use azure::sas::{self, Signer, Token};
+use azure::sas::{self, Signer};
 use http::server;
 use net::http::{Request, Response};
 
@@ -109,7 +109,10 @@ impl Session {
         }
         let sequence = self.next;
         self.next += 1;
-        let origin = format!("{}/{hub}/partitions/{partition}#{sequence}", base(&token));
+        let origin = format!(
+            "{}/{hub}/partitions/{partition}#{sequence}",
+            token.namespace()
+        );
         let arrived = Arrived::new(origin, request.body.clone());
         self.hubs
             .entry(hub.to_string())
@@ -130,16 +133,6 @@ impl Session {
             _ => Err("40400: No such partition"),
         }
     }
-}
-
-/// The token's scheme and authority, which is where the hub lives.
-fn base(token: &Token) -> &str {
-    token
-        .resource
-        .split_once("://")
-        .map_or(token.resource.as_str(), |(scheme, rest)| {
-            &token.resource[..scheme.len() + 3 + rest.find('/').unwrap_or(rest.len())]
-        })
 }
 
 fn refused(status: u16, detail: &str) -> (Event, Response) {
