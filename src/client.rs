@@ -96,7 +96,7 @@ impl Client {
 mod tests {
     use super::*;
     use crate::session::{Event, Session};
-    use transport::Arrived;
+    use transport::Taken;
     use transport::socket;
 
     #[test]
@@ -127,11 +127,11 @@ mod tests {
         let base = format!("http://{address}/telemetry/partitions");
         assert_eq!(
             events[0],
-            Event::Sent(Arrived::new(format!("{base}/0#1"), b"UNA:+.? '".to_vec()))
+            Event::Sent(Taken::new(format!("{base}/0#1"), b"UNA:+.? '".to_vec()))
         );
         assert_eq!(
             events[1],
-            Event::Sent(Arrived::new(format!("{base}/3#2"), vec![0, 0xff, b'\n']))
+            Event::Sent(Taken::new(format!("{base}/3#2"), vec![0, 0xff, b'\n']))
         );
         assert_eq!(events[2], Event::Refused("40400".to_string()));
         assert_eq!(
