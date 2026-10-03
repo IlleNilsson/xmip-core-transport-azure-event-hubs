@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::net::TcpListener;
 use std::time::Duration;
 
-use transport::Arrived;
+use transport::Taken;
 use transport::error::Result;
 
 use crate::ceiling;
@@ -30,14 +30,14 @@ pub const PARTITIONS: u32 = 4;
 pub enum Event {
     /// The client sent an event; here is the Stream, its origin the
     /// partition it landed on and the sequence number it was given.
-    Sent(Arrived),
+    Sent(Taken),
     /// The client was answered with this error subcode.
     Refused(String),
 }
 
 pub struct Session {
     signer: Signer,
-    hubs: BTreeMap<String, Vec<Arrived>>,
+    hubs: BTreeMap<String, Vec<Taken>>,
     next: u64,
     timeout: Option<Duration>,
 }
@@ -64,8 +64,8 @@ impl Session {
     /// Every event taken so far, in the order they came, each under its
     /// origin.
     #[must_use]
-    pub fn events(&self) -> Vec<Arrived> {
-        let mut all: Vec<Arrived> = self.hubs.values().flatten().cloned().collect();
+    pub fn events(&self) -> Vec<Taken> {
+        let mut all: Vec<Taken> = self.hubs.values().flatten().cloned().collect();
         all.sort_by_key(|event| {
             event
                 .origin_uri
@@ -113,12 +113,12 @@ impl Session {
             "{}/{hub}/partitions/{partition}#{sequence}",
             token.namespace()
         );
-        let arrived = Arrived::new(origin, request.body.clone());
+        let event = Taken::new(origin, request.body.clone());
         self.hubs
             .entry(hub.to_string())
             .or_default()
-            .push(arrived.clone());
-        (Event::Sent(arrived), Response::new(201))
+            .push(event.clone());
+        (Event::Sent(event), Response::new(201))
     }
 
     /// The hub and partition `target` names — the partition the target
@@ -167,7 +167,7 @@ mod tests {
             let sequence = expected + 1;
             assert_eq!(
                 event,
-                Event::Sent(Arrived::new(
+                Event::Sent(Taken::new(
                     format!("http://ns.local/telemetry/partitions/{partition}#{sequence}"),
                     b"e".to_vec()
                 ))
@@ -177,7 +177,7 @@ mod tests {
         let (event, _) = session.answer(&chosen);
         assert_eq!(
             event,
-            Event::Sent(Arrived::new(
+            Event::Sent(Taken::new(
                 "http://ns.local/telemetry/partitions/3#6",
                 Vec::new()
             ))

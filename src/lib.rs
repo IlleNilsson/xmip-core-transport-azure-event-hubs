@@ -171,6 +171,10 @@ impl Transport for EventHubsTransport {
         Directions::SEND
     }
 
+    fn arrivals(&self) -> transport::Arrivals {
+        transport::Arrivals::Unordered("it receives nothing: reading is AMQP, not built")
+    }
+
     /// Never anything: reading a hub is AMQP, and this transport says so.
     fn receive(&self) -> Result<Vec<Arrived>> {
         Err(TransportError::permanent(
@@ -274,6 +278,7 @@ impl Loopback for EventHubsTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use transport::Taken;
 
     fn node(endpoint: &str, key: &str) -> EventHubsTransport {
         EventHubsTransport::new(endpoint, "telemetry")
@@ -328,7 +333,7 @@ mod tests {
         let base = format!("http://{address}");
         assert_eq!(
             events[0],
-            Event::Sent(Arrived::new(
+            Event::Sent(Taken::new(
                 format!("{base}/telemetry/partitions/2#1"),
                 b"UNA:+.? '".to_vec()
             ))
