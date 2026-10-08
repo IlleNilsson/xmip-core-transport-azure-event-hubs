@@ -54,6 +54,7 @@ use http::endpoint::Connections;
 use net::Endpoint;
 use net::ceiling;
 pub use session::{Event, PARTITIONS, Session};
+use transport::ArrivalIdentity;
 use transport::error::{Result, TransportError, protocol_error};
 use transport::listening::Listening;
 use transport::loopback::{FarEnd, LOOPBACK_TIMEOUT, Loopback};
@@ -249,6 +250,12 @@ impl EventHubsTransport {
 }
 
 impl Loopback for EventHubsTransport {
+    fn arrival_identity(&self) -> ArrivalIdentity {
+        ArrivalIdentity::Unnamed(
+            "this technology sends only: the amqp technology reads an Event Hub",
+        )
+    }
+
     fn ceiling(&self) -> Option<usize> {
         Some(ceiling())
     }
