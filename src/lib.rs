@@ -176,6 +176,10 @@ impl Transport for EventHubsTransport {
         transport::Arrivals::Unordered("it receives nothing: reading is AMQP, not built")
     }
 
+    fn waiting(&self) -> transport::Waiting {
+        transport::Waiting::Polled("a receive never returns anything: reading is AMQP")
+    }
+
     /// Never anything: reading a hub is AMQP, and this transport says so.
     fn receive(&self) -> Result<Vec<Arrived>> {
         Err(TransportError::permanent(
