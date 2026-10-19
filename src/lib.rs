@@ -181,15 +181,20 @@ impl Transport for EventHubsTransport {
     }
 
     /// Never anything: reading a hub is AMQP, and this transport says so.
-    fn receive(&self) -> Result<Vec<Arrived>> {
+    fn receive_up_to(&self, _most: usize) -> Result<Vec<Arrived>> {
         Err(TransportError::permanent(
             "reading an Event Hub is AMQP 1.0, which the REST API does not speak; \
              this transport sends, and the amqp technology reads",
         ))
     }
 
-    fn send(&self, target: &str, bytes: &[u8]) -> Result<()> {
-        ceiling::within(bytes.len(), ceiling(), "one Event Hubs event carries")?;
+    fn sending(&self) -> transport::Sending {
+        transport::Sending::Gathered("one Event Hubs event carries the whole body")
+    }
+
+    fn send_from(&self, target: &str, outgoing: transport::Outgoing<'_>) -> Result<()> {
+        ceiling::within(outgoing.len(), ceiling(), "one Event Hubs event carries")?;
+        let bytes: &[u8] = &outgoing.gather()?;
         let (hub, partition) = self.resolve(target);
         self.client()?.send(hub, partition, bytes)
     }
