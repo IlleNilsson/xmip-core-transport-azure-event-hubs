@@ -4,7 +4,7 @@
 //! Stream, the partition it landed on and its sequence number kept beside
 //! it.
 //!
-//! Event Hubs is the event log of every organisation that lives in Azure:
+//! Event Hubs is the event log of every organization that lives in Azure:
 //! a hub, partitions under it, consumers reading each partition from an
 //! offset. Its REST API is one call: send an event to the hub, or to one
 //! of its partitions. A Send Location sends a Stream as one event, with a
@@ -24,7 +24,7 @@
 //! ```
 //!
 //! The endpoint and HTTP itself come from the http technology; the Shared
-//! Access Signature and the judgement of the namespace's answers from the
+//! Access Signature and the judgment of the namespace's answers from the
 //! Azure crate (ADR-0044). Until 2026-09-14 the last two came from the
 //! azure-service-bus technology, a sideways import the record forbids, and
 //! from the http technology until the owner's ruling of 2026-09-22: what
@@ -34,7 +34,7 @@
 //! Standard tier: [`ceiling`]. Nothing is refused for its content, an
 //! empty body included.
 //!
-//! A hub is not an artefact anyone claims, so [`Transport::claims`]
+//! A hub is not an artifact anyone claims, so [`Transport::claims`]
 //! answers `None`. The origin URI is the partition's URL with the sequence
 //! number as its fragment. A send target is a hub name under this
 //! transport's namespace, `hub/partitions/<id>` for one of its partitions,
