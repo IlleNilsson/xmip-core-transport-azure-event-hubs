@@ -232,6 +232,9 @@ impl Configured for EventHubsTransport {
         ],
     };
 
+    /// The schemes a Location's address is entered with to choose this technology.
+    const SCHEMES: &'static [&'static str] = &["azure-event-hubs"];
+
     fn configured(address: &str, settings: &Read) -> Result<Self> {
         // The policy and its key come through the Location's credentials.
         let hub = settings.optional_text("hub").unwrap_or_default();
