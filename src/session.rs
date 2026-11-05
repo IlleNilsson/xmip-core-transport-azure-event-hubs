@@ -1,5 +1,5 @@
 //! The far end: enough of Event Hubs to take one Location's events, and
-//! what a test or the playground puts on loopback.
+//! what a test or the essentials puts on loopback.
 //!
 //! Not Event Hubs. One session holds the events sent to every hub it is
 //! asked about in memory, by partition, verifies every request's token
