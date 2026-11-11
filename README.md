@@ -2,6 +2,8 @@
 
 Azure Event Hubs transport: a Shared Access Signature over the REST API — send a Stream as one event to a hub or one of its partitions; reading is AMQP, and this transport says so — a hub is a Location. A technology of [xmip-core-transport](https://github.com/IlleNilsson/xmip-core-transport).
 
+A Send Location sends to the hub, and the partition, its `hub` and `partition` settings name: it sends to the empty target (`Configured::own_target`, `transport::destination::OWN`), which it reads, through `transport::destination::named`, as those, its address naming only the namespace. A target naming another hub — `alarms`, `alarms/partitions/3` — still wins (ADR-0064, amendment 2026-11-10).
+
 The Shared Access Signature and the judgment of a namespace's answers come from [xmip-core-transport-azure](https://github.com/IlleNilsson/xmip-core-transport-azure), where every Azure technology shares what Azure speaks over HTTP (ADR-0044, amendment 2026-09-24); HTTP itself comes from [xmip-core-transport-http](https://github.com/IlleNilsson/xmip-core-transport-http).
 
 Requests go on connections kept between them (`http::endpoint::Connections`, offering HTTP/1.1): the transport holds them and hands them to every client it makes, so a call costs one exchange and not a connect, a TLS handshake and a `Connection: close`, as it did until 2026-09-27.

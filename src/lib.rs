@@ -153,9 +153,9 @@ impl EventHubsTransport {
     /// The hub and partition a target names — `hub`, `hub/partitions/3` —
     /// or this transport's own where it names none.
     fn resolve<'a>(&'a self, target: &'a str) -> (&'a str, Option<&'a str>) {
-        if target.is_empty() {
+        let Some(target) = transport::destination::named(target) else {
             return (&self.hub, self.partition.as_deref());
-        }
+        };
         match target.split_once("/partitions/") {
             Some((hub, partition)) => (hub, Some(partition)),
             None => (target, None),
@@ -235,6 +235,12 @@ impl Configured for EventHubsTransport {
     /// The schemes a Location's address is entered with to choose this technology.
     const SCHEMES: &'static [&'static str] = &["azure-event-hubs"];
 
+    /// The hub and partition settings: the address names only the
+    /// namespace.
+    fn own_target(_address: &str) -> &str {
+        transport::destination::OWN
+    }
+
     fn configured(address: &str, settings: &Read) -> Result<Self> {
         // The policy and its key come through the Location's credentials.
         let hub = settings.optional_text("hub").unwrap_or_default();
@@ -303,6 +309,18 @@ mod tests {
         EventHubsTransport::new(endpoint, "telemetry")
             .with_policy("policy", key)
             .timing_out_after(Duration::from_secs(2))
+    }
+
+    #[test]
+    fn a_send_location_sends_to_its_hub_and_a_target_naming_another_wins() {
+        use xcore::settings::Given;
+        let text = |name: &str, value: &str| (name.to_string(), Given::Text(value.to_string()));
+        let location = "azure-event-hubs://trade.servicebus.windows.net";
+        let given = [text("hub", "telemetry"), text("partition", "2")];
+        let sent = EventHubsTransport::open(location, Applies::Send, &given).expect("built");
+        let own = sent.resolve(EventHubsTransport::own_target(location));
+        assert_eq!(own, ("telemetry", Some("2")));
+        assert_eq!(sent.resolve("alarms"), ("alarms", None));
     }
 
     #[test]
