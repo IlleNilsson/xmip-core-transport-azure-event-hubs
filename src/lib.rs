@@ -20,7 +20,7 @@
 //!
 //! ```text
 //! client.rs    Xmip's side: send to the hub or to a partition
-//! session.rs   the far end a test or the essentials runs on loopback
+//! session.rs   the far end a test or the System Tests run on loopback
 //! ```
 //!
 //! The endpoint and HTTP itself come from the http technology; the Shared
@@ -133,7 +133,7 @@ impl EventHubsTransport {
     }
 
     /// A far end that holds this transport's policy and key, for a test or
-    /// the essentials to run on loopback.
+    /// the System Tests to run on loopback.
     #[must_use]
     pub fn session(&self) -> Session {
         let session = Session::new(&self.policy, &self.key);
@@ -450,8 +450,8 @@ mod tests {
         assert!(loopback.refuses(&[0xff]).is_none());
     }
 
-    /// The Essentials' edge payloads, written here so the crate does not
-    /// depend on it, and one at the brim.
+    /// The System Tests' edge payloads, written here so the crate does not
+    /// depend on them, and one at the brim.
     fn edge_payloads() -> Vec<(&'static str, Vec<u8>)> {
         vec![
             ("empty", Vec::new()),
