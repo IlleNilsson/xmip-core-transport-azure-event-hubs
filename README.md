@@ -4,6 +4,8 @@ Azure Event Hubs transport: a Shared Access Signature over the REST API — send
 
 A Send Location sends to the hub, and the partition, its `hub` and `partition` settings name: it sends to the empty target (`Configured::own_target`, `transport::destination::OWN`), which it reads, through `transport::destination::named`, as those, its address naming only the namespace. A target naming another hub — `alarms`, `alarms/partitions/3` — still wins (ADR-0064, amendment 2026-11-10).
 
+A Location signs under the shared access policy its `key_name` setting names, `RootManageSharedAccessKey` or one of its own, with the policy's key its `secret = "<name>"` names: a `password` secret kept in the Administration Database and never in configuration, read at each request, so a key set again reaches the next send without a restart (ADR-0019, amendment 2026-10-29; ADR-0015, amendment 2026-11-25). A Location naming a secret and no `key_name` is refused as the node starts: a Shared Access Signature names its policy.
+
 The Shared Access Signature and the judgment of a namespace's answers come from [xmip-core-transport-azure](https://github.com/IlleNilsson/xmip-core-transport-azure), where every Azure technology shares what Azure speaks over HTTP (ADR-0044, amendment 2026-09-24); HTTP itself comes from [xmip-core-transport-http](https://github.com/IlleNilsson/xmip-core-transport-http).
 
 Requests go on connections kept between them (`http::endpoint::Connections`, offering HTTP/1.1): the transport holds them and hands them to every client it makes, so a call costs one exchange and not a connect, a TLS handshake and a `Connection: close`, as it did until 2026-09-27.

@@ -84,6 +84,11 @@ pub struct EventHubsTransport {
     /// The connections kept to the service, shared by every client this
     /// makes.
     connections: Connections,
+    /// The secret a Location names, the key of the shared access policy
+    /// `policy` names, which a Shared Access Signature is made with, read
+    /// at each request (ADR-0019, amendment 2026-10-29; ADR-0015,
+    /// amendment 2026-11-25); `key` where it names none.
+    secret: Option<transport::Secured>,
 }
 
 impl EventHubsTransport {
@@ -100,6 +105,7 @@ impl EventHubsTransport {
             key: String::new(),
             timeout: None,
             connections: Connections::new(),
+            secret: None,
         }
     }
 
@@ -119,12 +125,16 @@ impl EventHubsTransport {
         self
     }
 
-    /// The client this transport speaks through.
+    /// The client this transport speaks through, signing with the policy's
+    /// key the Location's secret holds, read now, or this transport's own
+    /// where it names none.
     ///
     /// # Errors
-    /// Where the endpoint is not an HTTP URL.
+    /// Where the endpoint is not an HTTP URL, or the secret is not set or
+    /// not a password.
     pub fn client(&self) -> Result<Client> {
-        let client = Client::new(&self.endpoint, &self.policy, &self.key)?;
+        let key = transport::secured::presented(self.secret.as_ref(), &self.key, self.name())?;
+        let client = Client::new(&self.endpoint, &self.policy, &key)?;
         let client = client.sharing(self.connections.clone());
         Ok(match self.timeout {
             Some(timeout) => client.timing_out_after(timeout),
@@ -195,11 +205,13 @@ impl Transport for EventHubsTransport {
 
 impl Configured for EventHubsTransport {
     /// The address is the namespace, `https://<ns>.servicebus.windows.net`.
-    /// The shared access policy and its key are the Location's credentials,
-    /// not settings: a secret never is.
+    /// The shared access policy is the `key_name` setting, and its key the
+    /// Location's `secret`, a password secret the Administration Database
+    /// keeps, never a setting ([`Configured::secured_by`]).
     const SETTINGS: &'static Settings = &Settings {
         technology: env!("CARGO_PKG_NAME"),
         settings: &[
+            azure::key_name::key_name(Applies::Send),
             Setting {
                 name: "hub",
                 kind: Kind::Text,
@@ -237,13 +249,24 @@ impl Configured for EventHubsTransport {
     }
 
     fn configured(address: &str, settings: &Read) -> Result<Self> {
-        // The policy and its key come through the Location's credentials.
+        // The policy's key is the Location's secret (`secured_by`).
         let hub = settings.optional_text("hub").unwrap_or_default();
         let mut transport = Self::new(address, hub);
         if let Some(partition) = settings.optional_text("partition") {
             transport = transport.on_partition(partition);
         }
+        if let Some(policy) = settings.optional_text(azure::key_name::KEY_NAME) {
+            transport.policy = policy.to_string();
+        }
         Ok(transport)
+    }
+
+    /// The key of the policy `key_name` names, which the Location's secret
+    /// holds, read at each request. A Location naming a secret and no
+    /// `key_name` is refused (`azure::key_name::signing_as`).
+    fn secured_by(mut self, secret: transport::Secured) -> Result<Self> {
+        self.secret = Some(azure::key_name::signing_as(&self.policy, secret)?);
+        Ok(self)
     }
 
     /// The connections its clients share, an HTTP/2 one's frames in a span
@@ -343,7 +366,7 @@ mod tests {
         );
         assert_eq!(sent.partition.as_deref(), Some("2"));
         assert_eq!(sent.timeout, Some(Duration::from_secs(5)));
-        assert!(sent.key.is_empty(), "the key is the credentials'");
+        assert!(sent.key.is_empty(), "the key is the Location's secret");
         let Err(refused) = EventHubsTransport::open(namespace, Applies::Send, &given[1..]) else {
             panic!("the hub is required");
         };
@@ -397,6 +420,46 @@ mod tests {
             far_end.join().expect("thread"),
             Event::Refused("40103".to_string())
         );
+    }
+
+    #[test]
+    fn a_location_presents_the_key_of_the_policy_it_names_from_its_secret() {
+        use transport::secured::Kept;
+        use xcore::settings::Given;
+        let drawn = Kept::drawn();
+        let (listener, address) = socket::bind_tcp("127.0.0.1:0").expect("bind");
+        let mut session = node("http://x", &drawn).session();
+        let far_end = std::thread::spawn(move || session.serve_one(&listener).expect("served"));
+        let text = |name: &str, value: &str| (name.to_string(), Given::Text(value.to_string()));
+        let endpoint = format!("http://{address}");
+        let kept = std::sync::Arc::new(Kept::default());
+        let unnamed = [text("hub", "telemetry")];
+        let refused = EventHubsTransport::open(&endpoint, Applies::Send, &unnamed)
+            .expect("built")
+            .secured_by(kept.secured("partner-x.hubs"))
+            .err()
+            .expect("a secret with no policy is refused");
+        assert!(
+            !refused.retryable && refused.message.contains("\"key_name\""),
+            "{refused}"
+        );
+        let given = [text("hub", "telemetry"), text("key_name", "policy")];
+        let near = EventHubsTransport::open(&endpoint, Applies::Send, &given)
+            .expect("built")
+            .timing_out_after(Duration::from_secs(2))
+            .secured_by(kept.secured("partner-x.hubs"))
+            .expect("Event Hubs presents the policy's key");
+        let unset = near.send("", b"x").expect_err("not set yet");
+        assert!(
+            unset.retryable && unset.message.contains("is not set"),
+            "{unset}"
+        );
+        kept.set("partner-x.hubs", xcore::SecretKind::Password, &drawn);
+        near.send("", b"signed").expect("signed with the secret");
+        let Event::Sent(taken) = far_end.join().expect("thread") else {
+            panic!("refused");
+        };
+        assert_eq!(taken.bytes, b"signed");
     }
 
     #[test]
