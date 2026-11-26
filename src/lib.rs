@@ -42,37 +42,59 @@
 //!
 //! The transport is its own far end (ADR-0051): [`Loopback`] stands the
 //! session up at the endpoint's authority and takes the one send.
+//!
+//! **Built with its `declaration` feature alone** the crate is
+//! [`declaration`], what a Location of it is configured with, and none of
+//! the code above, which is behind the default feature: what the surfaces'
+//! library carries (ADR-0064, amendment 2026-11-26).
 
+#[cfg(feature = "default")]
 pub mod client;
+#[cfg(feature = "declaration")]
+pub mod declaration;
+#[cfg(feature = "default")]
 pub mod session;
 
+#[cfg(feature = "default")]
 use std::net::TcpListener;
+#[cfg(feature = "default")]
 use std::time::Duration;
 
+#[cfg(feature = "default")]
 pub use client::{CONTENT_TYPE, Client};
+#[cfg(feature = "default")]
 use http::endpoint::Connections;
-use net::Endpoint;
-use net::ceiling;
+#[cfg(feature = "default")]
+use net::{Endpoint, ceiling};
+#[cfg(feature = "default")]
 pub use session::{Event, PARTITIONS, Session};
-use transport::ArrivalIdentity;
+#[cfg(feature = "default")]
 use transport::error::{Result, TransportError, protocol_error};
-use transport::listening::Listening;
+#[cfg(feature = "default")]
 use transport::loopback::{FarEnd, LOOPBACK_TIMEOUT, Loopback};
-use transport::socket;
+#[cfg(feature = "default")]
+use transport::{ArrivalIdentity, listening::Listening, socket};
+#[cfg(feature = "default")]
 use transport::{Arrived, Configured, Directions, Transport};
-use xcore::settings::{Applies, Kind, Presence, Read, Setting, Settings};
+#[cfg(feature = "default")]
+use xcore::settings::{Read, Settings};
 
 /// The largest event a Standard namespace carries: one mebibyte.
+#[cfg(feature = "default")]
 #[must_use]
 pub const fn ceiling() -> usize {
     1024 * 1024
 }
 
 /// What the loopback pair agrees on: one hub, one policy and its key.
+#[cfg(feature = "default")]
 const LOOPBACK_HUB: &str = "telemetry";
+#[cfg(feature = "default")]
 const LOOPBACK_POLICY: &str = "RootManageSharedAccessKey";
+#[cfg(feature = "default")]
 const LOOPBACK_KEY: &str = "probe";
 
+#[cfg(feature = "default")]
 #[derive(Clone)]
 pub struct EventHubsTransport {
     endpoint: String,
@@ -91,6 +113,7 @@ pub struct EventHubsTransport {
     secret: Option<transport::Secured>,
 }
 
+#[cfg(feature = "default")]
 impl EventHubsTransport {
     /// Speak to the namespace at `endpoint` — `https://<ns>.servicebus.
     /// windows.net` in the cloud, `http://host:port` for a stand-in —
@@ -166,6 +189,7 @@ impl EventHubsTransport {
     }
 }
 
+#[cfg(feature = "default")]
 impl Transport for EventHubsTransport {
     fn name(&self) -> &'static str {
         "azure-event-hubs"
@@ -203,40 +227,10 @@ impl Transport for EventHubsTransport {
     }
 }
 
+#[cfg(feature = "default")]
 impl Configured for EventHubsTransport {
-    /// The address is the namespace, `https://<ns>.servicebus.windows.net`.
-    /// The shared access policy is the `key_name` setting, and its key the
-    /// Location's `secret`, a password secret the Administration Database
-    /// keeps, never a setting ([`Configured::secured_by`]).
-    const SETTINGS: &'static Settings = &Settings {
-        technology: env!("CARGO_PKG_NAME"),
-        settings: &[
-            azure::key_name::key_name(Applies::Send),
-            Setting {
-                name: "hub",
-                kind: Kind::Text,
-                presence: Presence::Required,
-                meaning: "The Event Hub sent to when a send target names none.",
-                applies: Applies::Send,
-            },
-            Setting {
-                name: "partition",
-                kind: Kind::Text,
-                presence: Presence::Optional,
-                meaning: "The partition of the hub sent to; the hub chooses when left out.",
-                applies: Applies::Send,
-            },
-            transport::configured::timeout(
-                Applies::Send,
-                None,
-                "How long an endpoint that stops answering is waited on; unbounded \
-                 when left out.",
-            ),
-        ],
-    };
-
-    /// The schemes a Location's address is entered with to choose this technology.
-    const SCHEMES: &'static [&'static str] = &["azure-event-hubs"];
+    const SETTINGS: &'static Settings = declaration::SETTINGS;
+    const SCHEMES: &'static [&'static str] = declaration::SCHEMES;
 
     /// The hub and partition settings: the address names only the
     /// namespace.
@@ -277,6 +271,7 @@ impl Configured for EventHubsTransport {
     }
 }
 
+#[cfg(feature = "default")]
 impl EventHubsTransport {
     /// Both ends on this machine: an ephemeral local port, one policy and
     /// key the far end expects and the near end signs with, the loopback
@@ -289,6 +284,7 @@ impl EventHubsTransport {
     }
 }
 
+#[cfg(feature = "default")]
 impl Loopback for EventHubsTransport {
     fn arrival_identity(&self) -> ArrivalIdentity {
         ArrivalIdentity::Unnamed(
@@ -326,6 +322,7 @@ impl Loopback for EventHubsTransport {
 mod tests {
     use super::*;
     use transport::Taken;
+    use xcore::settings::Applies;
 
     fn node(endpoint: &str, key: &str) -> EventHubsTransport {
         EventHubsTransport::new(endpoint, "telemetry")

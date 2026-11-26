@@ -12,6 +12,10 @@ Requests go on connections kept between them (`http::endpoint::Connections`, off
 
 The namespace an origin names is `azure::sas::Token::namespace`; until 2026-09-28 this technology and Service Bus each cut a token's resource by hand.
 
+## The declaration
+
+What a Location of this technology is configured with is two `const`s in its `declaration` module, `src/declaration.rs`, beside the code, which `Configured` reads (ADR-0064, amendment 2026-11-26): `declaration::SETTINGS`, `key_name`, `hub`, `partition` and `timeout`, and `SCHEMES`, `azure-event-hubs`; `key_name` is the Azure crate's, which this crate's declaration takes by that crate's own `declaration` feature. Built with its `declaration` feature alone (`--no-default-features --features declaration`), the crate is those and nothing more: its code and every crate the code is built on — the http technology, and with it TLS — are behind the default feature, and `tls`, which is code, turns the default on with it. So the library the surfaces load can carry it without the code, for the language server and the desktop to suggest and check an Event Hubs Location's settings though no node in their process loaded the technology, once the gathering crate of open problem 48 links it. `test/Declaration.Test.ps1` in the estate holds that the declaration builds nothing the transport capability does not.
+
 ## Toolchain
 
 `rust-toolchain.toml` pins the toolchain for the whole estate. Do not change it
